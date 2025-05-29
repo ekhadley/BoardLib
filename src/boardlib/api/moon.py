@@ -51,20 +51,28 @@ IDS_TO_ANGLES = {
 
 def get_session(username, password):
     session = requests.Session()
-    home_page_response = session.get(HOST)
-    home_page_response.raise_for_status()
-    form_token = bs4.BeautifulSoup(home_page_response.text, "html.parser").find(
-        "input"
-    )["value"]
+    login_page_url = f"{HOST}/Account/Login"
+    login_page_response = session.get(login_page_url)
+    login_page_response.raise_for_status()
+    soup = bs4.BeautifulSoup(login_page_response.text, "html.parser")
+    token_tag = soup.find("input", {"name": "__RequestVerificationToken"})
+    if not token_tag or "value" not in token_tag.attrs:
+        raise ValueError(
+            "__RequestVerificationToken not found in login page HTML."
+        )
+    form_token = token_tag["value"]
     login_response = session.post(
-        f"{HOST}/Account/Login",
+        login_page_url,  # POST to the same URL
         data={
             "Login.Username": username,
             "Login.Password": password,
             "__RequestVerificationToken": form_token,
-            "X-Requested-With": "XMLHttpRequest",
+            "X-Requested-With": "XMLHttpRequest",  # As per requirement
         },
-        headers={"X-Requested-With": "XMLHttpRequest"},
+        headers={
+            "X-Requested-With": "XMLHttpRequest",  # Kept as it's common practice
+            "Referer": login_page_url, # Often good practice to include referer
+        },
     )
     login_response.raise_for_status()
     return session
